@@ -1,0 +1,22 @@
+{
+    "name": "Run ASP.NET Core Microservices",
+    "image": "mcr.microsoft.com/dotnet/sdk:8.0",
+    "features": {
+        "docker-in-docker": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/azure-cli:1": {},
+        "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {}
+    },
+    "postCreateCommand": "dotnet restore",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-azuretools.vscode-docker",
+                "ms-kubernetes-tools.vscode-kubernetes-tools"
+            ]
+        }
+    },
+    "workspaceFolder": "/workspace",
+    "remoteUser": "vscode"
+}

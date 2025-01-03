@@ -89,9 +89,17 @@ docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 
 ![mainscreen2](https://user-images.githubusercontent.com/1147445/81381837-08226000-9116-11ea-9489-82645b8dbfc4.png)
 
-## Authors
+## Launching GitHub Codespace
 
-* **Mehmet Ozkaya** - *Initial work* - [mehmetozkaya](https://github.com/mehmetozkaya)
+To launch a GitHub Codespace for this project, follow these steps:
 
-See also the list of [contributors](https://github.com/aspnetrun/run-core/contributors) who participated in this project. Check also [gihtub page of repository.](https://aspnetrun.github.io/run-aspnetcore-angular-realworld/)
+1. Click on the **Code** button at the top right of the repository page.
+2. Select **Open with Codespaces**.
+3. If you don't have a Codespace already, click on **New codespace**.
+4. Wait for the Codespace to be created and started.
 
+The Codespace will automatically install all required dependencies, including Docker, Azure CLI, and kubectl.
+
+## .devcontainer Directory
+
+The repository now includes a `.devcontainer` directory with a `devcontainer.json` file. This file defines the Docker image to use for the development container and includes configurations to install Docker, Azure CLI, and kubectl.
