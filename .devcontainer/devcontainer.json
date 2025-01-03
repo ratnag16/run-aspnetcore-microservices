@@ -17,6 +17,6 @@
             ]
         }
     },
-    "workspaceFolder": "/workspace",
+    "workspaceFolder": "/workspaces/run-aspnetcore-microservices",
     "remoteUser": "vscode"
 }

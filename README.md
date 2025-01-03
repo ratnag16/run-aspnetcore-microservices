@@ -100,6 +100,10 @@ To launch a GitHub Codespace for this project, follow these steps:
 
 The Codespace will automatically install all required dependencies, including Docker, Azure CLI, and kubectl.
 
+### Ensuring the Workspace is Defined
+
+To ensure the workspace is defined during the GitHub Codespace launch, make sure the `workspaceFolder` property in the `.devcontainer/devcontainer.json` file is set to `/workspaces/run-aspnetcore-microservices`.
+
 ## .devcontainer Directory
 
 The repository now includes a `.devcontainer` directory with a `devcontainer.json` file. This file defines the Docker image to use for the development container and includes configurations to install Docker, Azure CLI, and kubectl.
