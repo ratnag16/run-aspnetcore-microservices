@@ -181,6 +181,22 @@ spec:
         emptyDir: {}
 
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-api
+spec:
+  selector:
+    app: catalog-api
+  ports:
+    - protocol: TCP
+      port: 6000
+      targetPort: 8080
+    - protocol: TCP
+      port: 6060
+      targetPort: 8081
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -232,6 +248,22 @@ spec:
         emptyDir: {}
 
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: basket-api
+spec:
+  selector:
+    app: basket-api
+  ports:
+    - protocol: TCP
+      port: 6001
+      targetPort: 8080
+    - protocol: TCP
+      port: 6061
+      targetPort: 8081
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -271,6 +303,22 @@ spec:
         emptyDir: {}
       - name: aspnet-https
         emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discount-grpc
+spec:
+  selector:
+    app: discount-grpc
+  ports:
+    - protocol: TCP
+      port: 6002
+      targetPort: 8080
+    - protocol: TCP
+      port: 6062
+      targetPort: 8081
 
 ---
 apiVersion: apps/v1
@@ -322,6 +370,22 @@ spec:
         emptyDir: {}
 
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ordering-api
+spec:
+  selector:
+    app: ordering-api
+  ports:
+    - protocol: TCP
+      port: 6003
+      targetPort: 8080
+    - protocol: TCP
+      port: 6063
+      targetPort: 8081
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -359,6 +423,22 @@ spec:
         emptyDir: {}
       - name: aspnet-https
         emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yarpapigateway
+spec:
+  selector:
+    app: yarpapigateway
+  ports:
+    - protocol: TCP
+      port: 6004
+      targetPort: 8080
+    - protocol: TCP
+      port: 6064
+      targetPort: 8081
 
 ---
 apiVersion: apps/v1
@@ -400,3 +480,19 @@ spec:
         emptyDir: {}
       - name: aspnet-https
         emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shopping-web
+spec:
+  selector:
+    app: shopping-web
+  ports:
+    - protocol: TCP
+      port: 6005
+      targetPort: 8080
+    - protocol: TCP
+      port: 6065
+      targetPort: 8081
