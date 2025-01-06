@@ -1,0 +1,402 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalogdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalogdb
+  template:
+    metadata:
+      labels:
+        app: catalogdb
+    spec:
+      containers:
+      - name: catalogdb
+        image: postgres
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "CatalogDb"
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data/
+          name: postgres-catalog-volume
+      volumes:
+      - name: postgres-catalog-volume
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basketdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: basketdb
+  template:
+    metadata:
+      labels:
+        app: basketdb
+    spec:
+      containers:
+      - name: basketdb
+        image: postgres
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "BasketDb"
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data/
+          name: postgres-basket-volume
+      volumes:
+      - name: postgres-basket-volume
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: distributedcache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: distributedcache
+  template:
+    metadata:
+      labels:
+        app: distributedcache
+    spec:
+      containers:
+      - name: distributedcache
+        image: redis
+        ports:
+        - containerPort: 6379
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orderdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orderdb
+  template:
+    metadata:
+      labels:
+        app: orderdb
+    spec:
+      containers:
+      - name: orderdb
+        image: mcr.microsoft.com/mssql/server
+        env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: SA_PASSWORD
+          value: "SwN12345678"
+        ports:
+        - containerPort: 1433
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messagebroker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: messagebroker
+  template:
+    metadata:
+      labels:
+        app: messagebroker
+    spec:
+      containers:
+      - name: messagebroker
+        image: rabbitmq:management
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: "guest"
+        - name: RABBITMQ_DEFAULT_PASS
+          value: "guest"
+        ports:
+        - containerPort: 5672
+        - containerPort: 15672
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-api
+  template:
+    metadata:
+      labels:
+        app: catalog-api
+    spec:
+      containers:
+      - name: catalog-api
+        image: catalogapi
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        - name: ASPNETCORE_HTTPS_PORTS
+          value: "8081"
+        - name: ConnectionStrings__Database
+          value: "Server=catalogdb;Port=5432;Database=CatalogDb;User Id=postgres;Password=postgres;Include Error Detail=true"
+        ports:
+        - containerPort: 8080
+        - containerPort: 8081
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basket-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: basket-api
+  template:
+    metadata:
+      labels:
+        app: basket-api
+    spec:
+      containers:
+      - name: basket-api
+        image: basketapi
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        - name: ASPNETCORE_HTTPS_PORTS
+          value: "8081"
+        - name: ConnectionStrings__Database
+          value: "Server=basketdb;Port=5432;Database=BasketDb;User Id=postgres;Password=postgres;Include Error Detail=true"
+        - name: ConnectionStrings__Redis
+          value: "distributedcache:6379"
+        - name: GrpcSettings__DiscountUrl
+          value: "https://discount.grpc:8081"
+        - name: MessageBroker__Host
+          value: "amqp://ecommerce-mq:5672"
+        - name: MessageBroker__UserName
+          value: "guest"
+        - name: MessageBroker__Password
+          value: "guest"
+        ports:
+        - containerPort: 8080
+        - containerPort: 8081
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discount-grpc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discount-grpc
+  template:
+    metadata:
+      labels:
+        app: discount-grpc
+    spec:
+      containers:
+      - name: discount-grpc
+        image: discountgrpc
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        - name: ASPNETCORE_HTTPS_PORTS
+          value: "8081"
+        - name: ConnectionStrings__Database
+          value: "Data Source=discountdb"
+        ports:
+        - containerPort: 8080
+        - containerPort: 8081
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ordering-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ordering-api
+  template:
+    metadata:
+      labels:
+        app: ordering-api
+    spec:
+      containers:
+      - name: ordering-api
+        image: orderingapi
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        - name: ASPNETCORE_HTTPS_PORTS
+          value: "8081"
+        - name: ConnectionStrings__Database
+          value: "Server=orderdb;Database=OrderDb;User Id=sa;Password=SwN12345678;Encrypt=False;TrustServerCertificate=True"
+        - name: MessageBroker__Host
+          value: "amqp://ecommerce-mq:5672"
+        - name: MessageBroker__UserName
+          value: "guest"
+        - name: MessageBroker__Password
+          value: "guest"
+        - name: FeatureManagement__OrderFullfilment
+          value: "false"
+        ports:
+        - containerPort: 8080
+        - containerPort: 8081
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yarpapigateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yarpapigateway
+  template:
+    metadata:
+      labels:
+        app: yarpapigateway
+    spec:
+      containers:
+      - name: yarpapigateway
+        image: yarpapigateway
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        - name: ASPNETCORE_HTTPS_PORTS
+          value: "8081"
+        ports:
+        - containerPort: 8080
+        - containerPort: 8081
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shopping-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shopping-web
+  template:
+    metadata:
+      labels:
+        app: shopping-web
+    spec:
+      containers:
+      - name: shopping-web
+        image: shoppingweb
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        - name: ASPNETCORE_HTTPS_PORTS
+          value: "8081"
+        - name: ApiSettings__GatewayAddress
+          value: "http://yarpapigateway:8080"
+        ports:
+        - containerPort: 8080
+        - containerPort: 8081
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
