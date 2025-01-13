@@ -32,6 +32,22 @@ spec:
         emptyDir: {}
 
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalogdb
+spec:
+  type: NodePort
+  selector:
+    app: catalogdb
+  ports:
+    - name: db
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+      nodePort: 30001
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -64,6 +80,22 @@ spec:
       volumes:
       - name: postgres-basket-volume
         emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: basketdb
+spec:
+  type: NodePort
+  selector:
+    app: basketdb
+  ports:
+    - name: db
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+      nodePort: 30002
 
 ---
 apiVersion: apps/v1
@@ -156,19 +188,17 @@ spec:
     spec:
       containers:
       - name: catalog-api
-        image: catalogapi
+        image: catalogapi:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: ASPNETCORE_ENVIRONMENT
           value: "Development"
         - name: ASPNETCORE_HTTP_PORTS
           value: "8080"
-        - name: ASPNETCORE_HTTPS_PORTS
-          value: "8081"
         - name: ConnectionStrings__Database
-          value: "Server=catalogdb;Port=5432;Database=CatalogDb;User Id=postgres;Password=postgres;Include Error Detail=true"
+          value: "Server=$(CATALOGDB_SERVICE_HOST);Port=5432;Database=CatalogDb;User Id=postgres;Password=postgres;Include Error Detail=true"
         ports:
         - containerPort: 8080
-        - containerPort: 8081
         volumeMounts:
         - mountPath: /home/app/.microsoft/usersecrets
           name: user-secrets
@@ -189,12 +219,10 @@ spec:
   selector:
     app: catalog-api
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 6000
       targetPort: 8080
-    - protocol: TCP
-      port: 6060
-      targetPort: 8081
 
 ---
 apiVersion: apps/v1
@@ -213,16 +241,15 @@ spec:
     spec:
       containers:
       - name: basket-api
-        image: basketapi
+        image: basketapi:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: ASPNETCORE_ENVIRONMENT
           value: "Development"
         - name: ASPNETCORE_HTTP_PORTS
           value: "8080"
-        - name: ASPNETCORE_HTTPS_PORTS
-          value: "8081"
         - name: ConnectionStrings__Database
-          value: "Server=basketdb;Port=5432;Database=BasketDb;User Id=postgres;Password=postgres;Include Error Detail=true"
+          value: "Server=$(BASKETDB_SERVICE_HOST);Port=5432;Database=BasketDb;User Id=postgres;Password=postgres;Include Error Detail=true"
         - name: ConnectionStrings__Redis
           value: "distributedcache:6379"
         - name: GrpcSettings__DiscountUrl
@@ -235,7 +262,6 @@ spec:
           value: "guest"
         ports:
         - containerPort: 8080
-        - containerPort: 8081
         volumeMounts:
         - mountPath: /home/app/.microsoft/usersecrets
           name: user-secrets
@@ -256,12 +282,10 @@ spec:
   selector:
     app: basket-api
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 6001
       targetPort: 8080
-    - protocol: TCP
-      port: 6061
-      targetPort: 8081
 
 ---
 apiVersion: apps/v1
@@ -280,19 +304,17 @@ spec:
     spec:
       containers:
       - name: discount-grpc
-        image: discountgrpc
+        image: discountgrpc:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: ASPNETCORE_ENVIRONMENT
           value: "Development"
         - name: ASPNETCORE_HTTP_PORTS
           value: "8080"
-        - name: ASPNETCORE_HTTPS_PORTS
-          value: "8081"
         - name: ConnectionStrings__Database
           value: "Data Source=discountdb"
         ports:
         - containerPort: 8080
-        - containerPort: 8081
         volumeMounts:
         - mountPath: /home/app/.microsoft/usersecrets
           name: user-secrets
@@ -313,12 +335,10 @@ spec:
   selector:
     app: discount-grpc
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 6002
       targetPort: 8080
-    - protocol: TCP
-      port: 6062
-      targetPort: 8081
 
 ---
 apiVersion: apps/v1
@@ -337,16 +357,15 @@ spec:
     spec:
       containers:
       - name: ordering-api
-        image: orderingapi
+        image: orderingapi:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: ASPNETCORE_ENVIRONMENT
           value: "Development"
         - name: ASPNETCORE_HTTP_PORTS
           value: "8080"
-        - name: ASPNETCORE_HTTPS_PORTS
-          value: "8081"
         - name: ConnectionStrings__Database
-          value: "Server=orderdb;Database=OrderDb;User Id=sa;Password=SwN12345678;Encrypt=False;TrustServerCertificate=True"
+          value: "Server=$(ORDERDB_SERVICE_HOST);Database=OrderDb;User Id=sa;Password=SwN12345678;Encrypt=False;TrustServerCertificate=True"
         - name: MessageBroker__Host
           value: "amqp://ecommerce-mq:5672"
         - name: MessageBroker__UserName
@@ -357,7 +376,6 @@ spec:
           value: "false"
         ports:
         - containerPort: 8080
-        - containerPort: 8081
         volumeMounts:
         - mountPath: /home/app/.microsoft/usersecrets
           name: user-secrets
@@ -378,12 +396,10 @@ spec:
   selector:
     app: ordering-api
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 6003
       targetPort: 8080
-    - protocol: TCP
-      port: 6063
-      targetPort: 8081
 
 ---
 apiVersion: apps/v1
@@ -402,17 +418,15 @@ spec:
     spec:
       containers:
       - name: yarpapigateway
-        image: yarpapigateway
+        image: yarpapigateway:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: ASPNETCORE_ENVIRONMENT
           value: "Development"
         - name: ASPNETCORE_HTTP_PORTS
           value: "8080"
-        - name: ASPNETCORE_HTTPS_PORTS
-          value: "8081"
         ports:
         - containerPort: 8080
-        - containerPort: 8081
         volumeMounts:
         - mountPath: /home/app/.microsoft/usersecrets
           name: user-secrets
@@ -430,15 +444,14 @@ kind: Service
 metadata:
   name: yarpapigateway
 spec:
+  type: LoadBalancer
   selector:
     app: yarpapigateway
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 6004
       targetPort: 8080
-    - protocol: TCP
-      port: 6064
-      targetPort: 8081
 
 ---
 apiVersion: apps/v1
@@ -457,19 +470,17 @@ spec:
     spec:
       containers:
       - name: shopping-web
-        image: shoppingweb
+        image: shoppingweb:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: ASPNETCORE_ENVIRONMENT
           value: "Development"
         - name: ASPNETCORE_HTTP_PORTS
           value: "8080"
-        - name: ASPNETCORE_HTTPS_PORTS
-          value: "8081"
         - name: ApiSettings__GatewayAddress
           value: "http://yarpapigateway:8080"
         ports:
         - containerPort: 8080
-        - containerPort: 8081
         volumeMounts:
         - mountPath: /home/app/.microsoft/usersecrets
           name: user-secrets
@@ -487,12 +498,11 @@ kind: Service
 metadata:
   name: shopping-web
 spec:
+  type: LoadBalancer
   selector:
     app: shopping-web
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 6005
       targetPort: 8080
-    - protocol: TCP
-      port: 6065
-      targetPort: 8081
