@@ -96,3 +96,321 @@ spec:
       protocol: TCP
       port: 6002
       targetPort: 8080
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messagebroker
+  namespace: shopping
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: messagebroker
+  template:
+    metadata:
+      labels:
+        app: messagebroker
+    spec:
+      containers:
+      - name: messagebroker
+        image: rabbitmq:management
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: "guest"
+        - name: RABBITMQ_DEFAULT_PASS
+          value: "guest"
+        ports:
+        - containerPort: 5672
+        - containerPort: 15672
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: messagebroker
+  namespace: shopping
+spec:
+  type: LoadBalancer
+  selector:
+    app: messagebroker
+  ports:
+    - name: amqp
+      protocol: TCP
+      port: 5672
+      targetPort: 5672
+    - name: management
+      protocol: TCP
+      port: 15672
+      targetPort: 15672
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orderdb
+  namespace: shopping
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orderdb
+  template:
+    metadata:
+      labels:
+        app: orderdb
+    spec:
+      containers:
+      - name: orderdb
+        image: mcr.microsoft.com/mssql/server
+        env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: SA_PASSWORD
+          value: "SwN12345678"
+        ports:
+        - containerPort: 1433
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orderdb
+  namespace: shopping
+spec:
+  type: ClusterIP
+  selector:
+    app: orderdb
+  ports:
+    - name: mssql
+      protocol: TCP
+      port: 1433
+      targetPort: 1433
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ordering-api
+  namespace: shopping
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ordering-api
+  template:
+    metadata:
+      labels:
+        app: ordering-api
+    spec:
+      containers:
+      - name: ordering-api
+        image: orderingapi:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        - name: ConnectionStrings__Database
+          value: "Server=$(ORDERDB_SERVICE_HOST);Database=OrderDb;User Id=sa;Password=SwN12345678;Encrypt=False;TrustServerCertificate=True"
+        - name: MessageBroker__Host
+          value: "amqp://messagebroker.shopping:5672"
+        - name: MessageBroker__UserName
+          value: "guest"
+        - name: MessageBroker__Password
+          value: "guest"
+        - name: FeatureManagement__OrderFullfilment
+          value: "false"
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ordering-api
+  namespace: shopping
+spec:
+  type: LoadBalancer
+  selector:
+    app: ordering-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 6003
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basketdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: basketdb
+  template:
+    metadata:
+      labels:
+        app: basketdb
+    spec:
+      containers:
+      - name: basketdb
+        image: postgres
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "BasketDb"
+        ports:
+        - containerPort: 5433
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data/
+          name: postgres-basket-volume
+      volumes:
+      - name: postgres-basket-volume
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: basketdb
+spec:
+  type: ClusterIP
+  selector:
+    app: basketdb
+  ports:
+    - name: db
+      protocol: TCP
+      port: 5433
+      targetPort: 5433
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basket-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: basket-api
+  template:
+    metadata:
+      labels:
+        app: basket-api
+    spec:
+      containers:
+      - name: basket-api
+        image: basketapi:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        - name: ConnectionStrings__Database
+          value: "Server=$(BASKETDB_SERVICE_HOST);Port=5433;Database=BasketDb;User Id=postgres;Password=postgres;Include Error Detail=true"
+        - name: ConnectionStrings__Redis
+          value: "$(DISTRIBUTEDCACHE_SERVICE_HOST):6379"
+        - name: GrpcSettings__DiscountUrl
+          value: "http://$(DISCOUNT_GRPC):8080"
+        - name: MessageBroker__Host
+          value: "amqp://messagebroker.shopping:5672"
+        - name: MessageBroker__UserName
+          value: "guest"
+        - name: MessageBroker__Password
+          value: "guest"
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: basket-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: basket-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 6001
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yarpapigateway
+  namespace: shopping
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yarpapigateway
+  template:
+    metadata:
+      labels:
+        app: yarpapigateway
+    spec:
+      containers:
+      - name: yarpapigateway
+        image: yarpapigateway:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yarpapigateway
+  namespace: shopping
+spec:
+  type: LoadBalancer
+  selector:
+    app: yarpapigateway
+  ports:
+    - name: http
+      protocol: TCP
+      port: 6004
+      targetPort: 8080

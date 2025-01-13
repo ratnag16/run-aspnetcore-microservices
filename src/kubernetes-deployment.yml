@@ -1,3 +1,29 @@
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: catalogdb-postgres-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/Users/macavenger/data/catalogdb"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catalogdb-postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,7 +55,8 @@ spec:
           name: postgres-catalog-volume
       volumes:
       - name: postgres-catalog-volume
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: catalogdb-postgres-pvc
 
 ---
 apiVersion: v1
@@ -46,130 +73,6 @@ spec:
       port: 5432
       targetPort: 5432
       nodePort: 30001
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: basketdb
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: basketdb
-  template:
-    metadata:
-      labels:
-        app: basketdb
-    spec:
-      containers:
-      - name: basketdb
-        image: postgres
-        env:
-        - name: POSTGRES_USER
-          value: "postgres"
-        - name: POSTGRES_PASSWORD
-          value: "postgres"
-        - name: POSTGRES_DB
-          value: "BasketDb"
-        ports:
-        - containerPort: 5432
-        volumeMounts:
-        - mountPath: /var/lib/postgresql/data/
-          name: postgres-basket-volume
-      volumes:
-      - name: postgres-basket-volume
-        emptyDir: {}
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: basketdb
-spec:
-  type: NodePort
-  selector:
-    app: basketdb
-  ports:
-    - name: db
-      protocol: TCP
-      port: 5432
-      targetPort: 5432
-      nodePort: 30002
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: distributedcache
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: distributedcache
-  template:
-    metadata:
-      labels:
-        app: distributedcache
-    spec:
-      containers:
-      - name: distributedcache
-        image: redis
-        ports:
-        - containerPort: 6379
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: orderdb
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: orderdb
-  template:
-    metadata:
-      labels:
-        app: orderdb
-    spec:
-      containers:
-      - name: orderdb
-        image: mcr.microsoft.com/mssql/server
-        env:
-        - name: ACCEPT_EULA
-          value: "Y"
-        - name: SA_PASSWORD
-          value: "SwN12345678"
-        ports:
-        - containerPort: 1433
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: messagebroker
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: messagebroker
-  template:
-    metadata:
-      labels:
-        app: messagebroker
-    spec:
-      containers:
-      - name: messagebroker
-        image: rabbitmq:management
-        env:
-        - name: RABBITMQ_DEFAULT_USER
-          value: "guest"
-        - name: RABBITMQ_DEFAULT_PASS
-          value: "guest"
-        ports:
-        - containerPort: 5672
-        - containerPort: 15672
 
 ---
 apiVersion: apps/v1
@@ -196,7 +99,7 @@ spec:
         - name: ASPNETCORE_HTTP_PORTS
           value: "8080"
         - name: ConnectionStrings__Database
-          value: "Server=$(CATALOGDB_SERVICE_HOST);Port=5432;Database=CatalogDb;User Id=postgres;Password=postgres;Include Error Detail=true"
+          value: "Server=$(CATALOGDB_SERVICE_HOST);Port=$(CATALOGDB_SERVICE_PORT);Database=CatalogDb;User Id=postgres;Password=postgres;Include Error Detail=true"
         ports:
         - containerPort: 8080
         volumeMounts:
@@ -216,6 +119,7 @@ kind: Service
 metadata:
   name: catalog-api
 spec:
+  type: LoadBalancer
   selector:
     app: catalog-api
   ports:
@@ -228,64 +132,37 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: basket-api
+  name: distributedcache
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: basket-api
+      app: distributedcache
   template:
     metadata:
       labels:
-        app: basket-api
+        app: distributedcache
     spec:
       containers:
-      - name: basket-api
-        image: basketapi:latest
-        imagePullPolicy: IfNotPresent
-        env:
-        - name: ASPNETCORE_ENVIRONMENT
-          value: "Development"
-        - name: ASPNETCORE_HTTP_PORTS
-          value: "8080"
-        - name: ConnectionStrings__Database
-          value: "Server=$(BASKETDB_SERVICE_HOST);Port=5432;Database=BasketDb;User Id=postgres;Password=postgres;Include Error Detail=true"
-        - name: ConnectionStrings__Redis
-          value: "distributedcache:6379"
-        - name: GrpcSettings__DiscountUrl
-          value: "https://discount.grpc:8081"
-        - name: MessageBroker__Host
-          value: "amqp://ecommerce-mq:5672"
-        - name: MessageBroker__UserName
-          value: "guest"
-        - name: MessageBroker__Password
-          value: "guest"
+      - name: distributedcache
+        image: redis
         ports:
-        - containerPort: 8080
-        volumeMounts:
-        - mountPath: /home/app/.microsoft/usersecrets
-          name: user-secrets
-        - mountPath: /home/app/.aspnet/https
-          name: aspnet-https
-      volumes:
-      - name: user-secrets
-        emptyDir: {}
-      - name: aspnet-https
-        emptyDir: {}
+        - containerPort: 6379
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: basket-api
+  name: distributedcache
 spec:
+  type: ClusterIP
   selector:
-    app: basket-api
+    app: distributedcache
   ports:
-    - name: http
+    - name: redis
       protocol: TCP
-      port: 6001
-      targetPort: 8080
+      port: 6379
+      targetPort: 6379
 
 ---
 apiVersion: apps/v1
@@ -332,6 +209,7 @@ kind: Service
 metadata:
   name: discount-grpc
 spec:
+  type: LoadBalancer
   selector:
     app: discount-grpc
   ports:
@@ -339,6 +217,95 @@ spec:
       protocol: TCP
       port: 6002
       targetPort: 8080
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: messagebroker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: messagebroker
+  template:
+    metadata:
+      labels:
+        app: messagebroker
+    spec:
+      containers:
+      - name: messagebroker
+        image: rabbitmq:management
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: "guest"
+        - name: RABBITMQ_DEFAULT_PASS
+          value: "guest"
+        ports:
+        - containerPort: 5672
+        - containerPort: 15672
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: messagebroker
+  labels:
+    app: messagebroker
+spec:
+  type: LoadBalancer
+  selector:
+    app: messagebroker
+  ports:
+    - name: amqp
+      protocol: TCP
+      port: 5672
+      targetPort: 5672
+    - name: management
+      protocol: TCP
+      port: 15672
+      targetPort: 15672
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orderdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orderdb
+  template:
+    metadata:
+      labels:
+        app: orderdb
+    spec:
+      containers:
+      - name: orderdb
+        image: mcr.microsoft.com/mssql/server
+        env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: SA_PASSWORD
+          value: "SwN12345678"
+        ports:
+        - containerPort: 1433
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orderdb
+spec:
+  type: ClusterIP
+  selector:
+    app: orderdb
+  ports:
+    - name: mssql
+      protocol: TCP
+      port: 1433
+      targetPort: 1433
 
 ---
 apiVersion: apps/v1
@@ -367,7 +334,7 @@ spec:
         - name: ConnectionStrings__Database
           value: "Server=$(ORDERDB_SERVICE_HOST);Database=OrderDb;User Id=sa;Password=SwN12345678;Encrypt=False;TrustServerCertificate=True"
         - name: MessageBroker__Host
-          value: "amqp://ecommerce-mq:5672"
+          value: "amqp://messagebroker:5672"
         - name: MessageBroker__UserName
           value: "guest"
         - name: MessageBroker__Password
@@ -393,12 +360,126 @@ kind: Service
 metadata:
   name: ordering-api
 spec:
+  type: LoadBalancer
   selector:
     app: ordering-api
   ports:
     - name: http
       protocol: TCP
       port: 6003
+      targetPort: 8080
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basketdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: basketdb
+  template:
+    metadata:
+      labels:
+        app: basketdb
+    spec:
+      containers:
+      - name: basketdb
+        image: postgres
+        env:
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "BasketDb"
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data/
+          name: postgres-basket-volume
+      volumes:
+      - name: postgres-basket-volume
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: basketdb
+spec:
+  type: ClusterIP
+  selector:
+    app: basketdb
+  ports:
+    - name: db
+      protocol: TCP
+      port: 5433
+      targetPort: 5432
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: basket-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: basket-api
+  template:
+    metadata:
+      labels:
+        app: basket-api
+    spec:
+      containers:
+      - name: basket-api
+        image: basketapi:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: ASPNETCORE_HTTP_PORTS
+          value: "8080"
+        - name: ConnectionStrings__Database
+          value: "Server=$(BASKETDB_SERVICE_HOST);Port=5433;Database=BasketDb;User Id=postgres;Password=postgres;Include Error Detail=true"
+        - name: ConnectionStrings__Redis
+          value: "$(DISTRIBUTEDCACHE_SERVICE_HOST):6379"
+        - name: GrpcSettings__DiscountUrl
+          value: "http://discount-grpc:6002"
+        - name: MessageBroker__Host
+          value: "amqp://messagebroker:5672"
+        - name: MessageBroker__UserName
+          value: "guest"
+        - name: MessageBroker__Password
+          value: "guest"
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - mountPath: /home/app/.microsoft/usersecrets
+          name: user-secrets
+        - mountPath: /home/app/.aspnet/https
+          name: aspnet-https
+      volumes:
+      - name: user-secrets
+        emptyDir: {}
+      - name: aspnet-https
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: basket-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: basket-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 6001
       targetPort: 8080
 
 ---
@@ -478,7 +559,7 @@ spec:
         - name: ASPNETCORE_HTTP_PORTS
           value: "8080"
         - name: ApiSettings__GatewayAddress
-          value: "http://yarpapigateway:8080"
+          value: "http://$(YARPAPIGATEWAY_SERVICE_HOST):6004"
         ports:
         - containerPort: 8080
         volumeMounts:
