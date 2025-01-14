@@ -1,0 +1,28 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- master
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: echo Hello, world!
+  displayName: 'Run a one-line script'
+
+- script: |
+    echo Add other tasks to build, test, and deploy your project.
+    echo See https://aka.ms/yaml
+  displayName: 'Run a multi-line script'
+
+- task: DockerCompose@1
+  inputs:
+    containerregistrytype: 'Azure Container Registry'
+    azureContainerRegistry: '{"loginServer":"vgang25.azurecr.io", "id" : "/subscriptions/19e84806-c56f-43e8-b9ea-eb00633a204c/resourceGroups/vg-kube/providers/Microsoft.ContainerRegistry/registries/vgang25"}'
+    dockerComposeFile: '**/docker-compose.yml'
+    additionalDockerComposeFiles: '**/docker-compose.override.yml'
+    action: 'Run a Docker Compose command'
+    dockerComposeCommand: 'buildAndPush'
