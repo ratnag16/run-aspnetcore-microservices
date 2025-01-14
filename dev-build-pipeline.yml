@@ -23,17 +23,22 @@ steps:
     containerregistrytype: 'Azure Container Registry'
     azureContainerRegistry: '{"loginServer":"vgang25.azurecr.io", "id" : "/subscriptions/19e84806-c56f-43e8-b9ea-eb00633a204c/resourceGroups/vg-kube/providers/Microsoft.ContainerRegistry/registries/vgang25"}'
     dockerComposeFile: '**/docker-compose.yml'
+    dockerComposeFileArgs: 'DOCKER_REGISTRY=vgang25.azurecr.io/shopping'
     projectName: 'shopping'
     action: 'Run a Docker Compose command'
     dockerComposeCommand: 'build'
   name: 'buildimages'
   displayName: 'Build docker images'
 
+- script: docker images
+  displayName: 'Display images list'
+
 - task: DockerCompose@1
   inputs:
     containerregistrytype: 'Azure Container Registry'
     azureContainerRegistry: '{"loginServer":"vgang25.azurecr.io", "id" : "/subscriptions/19e84806-c56f-43e8-b9ea-eb00633a204c/resourceGroups/vg-kube/providers/Microsoft.ContainerRegistry/registries/vgang25"}'
     dockerComposeFile: '**/docker-compose.yml'
+    dockerComposeFileArgs: 'DOCKER_REGISTRY=vgang25.azurecr.io/shopping'
     projectName: 'shopping'
     action: 'Run a Docker Compose command'
     dockerComposeCommand: 'push'
