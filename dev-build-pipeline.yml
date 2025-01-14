@@ -10,12 +10,12 @@ pool:
   vmImage: ubuntu-latest
 
 steps:
-- script: ls -l
+- script: pwd
   displayName: 'Run a one-line script'
 
 - script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
+    pwd
+    ls -l
   displayName: 'Run a multi-line script'
 
 - task: DockerCompose@1
@@ -26,3 +26,4 @@ steps:
     additionalDockerComposeFiles: 'docker-compose.override.yml'
     action: 'Run a Docker Compose command'
     dockerComposeCommand: 'buildAndPush'
+    currentWorkingDirectory: $(System.DefaultWorkingDirectory)
