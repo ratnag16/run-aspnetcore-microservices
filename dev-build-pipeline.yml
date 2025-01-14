@@ -25,4 +25,17 @@ steps:
     dockerComposeFile: '**/docker-compose.yml'
     projectName: 'shopping'
     action: 'Run a Docker Compose command'
-    dockerComposeCommand: 'buildAndPush'
+    dockerComposeCommand: 'build'
+  name: 'buildimages'
+  displayName: 'Build docker images'
+
+- task: DockerCompose@1
+  inputs:
+    containerregistrytype: 'Azure Container Registry'
+    azureContainerRegistry: '{"loginServer":"vgang25.azurecr.io", "id" : "/subscriptions/19e84806-c56f-43e8-b9ea-eb00633a204c/resourceGroups/vg-kube/providers/Microsoft.ContainerRegistry/registries/vgang25"}'
+    dockerComposeFile: '**/docker-compose.yml'
+    projectName: 'shopping'
+    action: 'Run a Docker Compose command'
+    dockerComposeCommand: 'push'
+  name: 'pushimages'
+  displayName: 'Push images to registry'
